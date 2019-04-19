@@ -16,6 +16,7 @@
  */
 package org.apache.commons.vfs2.provider.sftp;
 
+import com.jcraft.jsch.JSchException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -262,58 +263,82 @@ public class SftpFileObject extends AbstractFileObject<SftpFileSystem> {
 
     @Override
     protected boolean doIsReadable() throws Exception {
-        return getPermissions(true).isReadable();
+        try {
+            return getPermissions(true).isReadable();
+        } catch (JSchException e) {
+            // ignore; for non-linux based sftp servers
+        }
+        return true;
     }
 
     @Override
     protected boolean doSetReadable(final boolean readable, final boolean ownerOnly) throws Exception {
-        final PosixPermissions permissions = getPermissions(false);
-        final int newPermissions = permissions.makeReadable(readable, ownerOnly);
-        if (newPermissions == permissions.getPermissions()) {
-            return true;
+        try {
+            final PosixPermissions permissions = getPermissions(false);
+            final int newPermissions = permissions.makeReadable(readable, ownerOnly);
+            if (newPermissions == permissions.getPermissions()) {
+                return true;
+            }
+
+            attrs.setPERMISSIONS(newPermissions);
+            flushStat();
+        } catch (JSchException e) {
+            // ignore; for non-linux based sftp servers
         }
-
-        attrs.setPERMISSIONS(newPermissions);
-        flushStat();
-
         return true;
     }
 
     @Override
     protected boolean doIsWriteable() throws Exception {
-        return getPermissions(true).isWritable();
+        try {
+            return getPermissions(true).isWritable();
+        } catch (JSchException e) {
+            // ignore; for non-linux based sftp servers
+        }
+        return true;
     }
 
     @Override
     protected boolean doSetWritable(final boolean writable, final boolean ownerOnly) throws Exception {
-        final PosixPermissions permissions = getPermissions(false);
-        final int newPermissions = permissions.makeWritable(writable, ownerOnly);
-        if (newPermissions == permissions.getPermissions()) {
-            return true;
+        try {
+            final PosixPermissions permissions = getPermissions(false);
+            final int newPermissions = permissions.makeWritable(writable, ownerOnly);
+            if (newPermissions == permissions.getPermissions()) {
+                return true;
+            }
+
+            attrs.setPERMISSIONS(newPermissions);
+            flushStat();
+        } catch (JSchException e) {
+            // ignore; for non-linux based sftp servers
         }
-
-        attrs.setPERMISSIONS(newPermissions);
-        flushStat();
-
         return true;
     }
 
     @Override
     protected boolean doIsExecutable() throws Exception {
-        return getPermissions(true).isExecutable();
+        try {
+            return getPermissions(true).isExecutable();
+        } catch (JSchException e) {
+            // ignore; for non-linux based sftp servers
+        }
+        return true;
     }
 
     @Override
     protected boolean doSetExecutable(final boolean executable, final boolean ownerOnly) throws Exception {
-        final PosixPermissions permissions = getPermissions(false);
-        final int newPermissions = permissions.makeExecutable(executable, ownerOnly);
-        if (newPermissions == permissions.getPermissions()) {
-            return true;
+        try {
+            final PosixPermissions permissions = getPermissions(false);
+            final int newPermissions = permissions.makeExecutable(executable, ownerOnly);
+            if (newPermissions == permissions.getPermissions()) {
+                return true;
+            }
+
+            attrs.setPERMISSIONS(newPermissions);
+            flushStat();
+        } catch (JSchException e) {
+            // ignore; for non-linux based sftp servers
         }
-
-        attrs.setPERMISSIONS(newPermissions);
-        flushStat();
-
         return true;
     }
 

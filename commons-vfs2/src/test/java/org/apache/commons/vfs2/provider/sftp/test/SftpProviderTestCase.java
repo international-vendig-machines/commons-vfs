@@ -299,7 +299,13 @@ public class SftpProviderTestCase extends AbstractProviderTestConfig {
         final TestSuite suite = new TestSuite();
 
         // --- Standard VFS test suite
-        final SftpProviderTestCase standardTestCase = new SftpProviderTestCase(false);
+        final SftpProviderTestCase standardTestCase = new SftpProviderTestCase(false) {
+            @Override
+            public void prepare(DefaultFileSystemManager manager) throws Exception {
+                super.prepare(manager);
+                Server.setCommandFactory(new ScpCommandFactory(new TestCommandFactory()));
+            }
+        };
         final ProviderTestSuite sftpSuite = new BaseProviderTestSuite(standardTestCase);
 
         // VFS-405: set/get permissions
@@ -307,11 +313,32 @@ public class SftpProviderTestCase extends AbstractProviderTestConfig {
 
         suite.addTest(sftpSuite);
 
+        // no-ssh mode without stream proxy; streamProxy won't work whitout ssh
+        final SftpProviderTestCase noSshTestCase = new SftpProviderTestCase(false) {
+            @Override
+            public void prepare(DefaultFileSystemManager manager) throws Exception {
+                super.prepare(manager);
+                Server.setCommandFactory(new ScpCommandFactory(new TestNoCommandFactory()));
+            }
+        };
+        final ProviderTestSuite sftpNoSshSuite = new BaseProviderTestSuite(noSshTestCase);
+
+        // VFS-405: set/get permissions
+        //sftpNoSshSuite.addTests(PermissionsTests.class);
+
+        suite.addTest(sftpNoSshSuite);
+
         // --- VFS-440: stream proxy test suite
         // We override the addBaseTests method so that only
         // one test is run (we just test that the input/output are correctly forwarded, and
         // hence if the reading test succeeds/fails the other will also succeed/fail)
-        final SftpProviderTestCase streamProxyTestCase = new SftpProviderTestCase(true);
+        final SftpProviderTestCase streamProxyTestCase = new SftpProviderTestCase(true) {
+            @Override
+            public void prepare(DefaultFileSystemManager manager) throws Exception {
+                super.prepare(manager);
+                Server.setCommandFactory(new ScpCommandFactory(new TestCommandFactory()));
+            }
+        };
         final ProviderTestSuite sftpStreamSuite = new BaseProviderTestSuite(streamProxyTestCase) {
             @Override
             protected void addBaseTests() throws Exception {
@@ -476,6 +503,59 @@ public class SftpProviderTestCase extends AbstractProviderTestConfig {
                             new PrintStream(err).format("Unknown command %s%n", command);
                         }
                         code = -1;
+                    }
+
+                    if (out != null) {
+                        out.flush();
+                    }
+                    if (err != null) {
+                        err.flush();
+                    }
+                    callback.onExit(code);
+                }
+
+                @Override
+                public void destroy() {
+                }
+            };
+        }
+    }
+
+    private static class TestNoCommandFactory extends ScpCommandFactory {
+
+        @Override
+        public Command createCommand(final String command) {
+            return new Command() {
+                public ExitCallback callback = null;
+                public OutputStream out = null;
+                public OutputStream err = null;
+                public InputStream in = null;
+
+                @Override
+                public void setInputStream(final InputStream in) {
+                    this.in = in;
+                }
+
+                @Override
+                public void setOutputStream(final OutputStream out) {
+                    this.out = out;
+                }
+
+                @Override
+                public void setErrorStream(final OutputStream err) {
+                    this.err = err;
+                }
+
+                @Override
+                public void setExitCallback(final ExitCallback callback) {
+                    this.callback = callback;
+                }
+
+                @Override
+                public void start(final Environment env) throws IOException {
+                    int code = 255;
+                    if (err != null) {
+                        new PrintStream(err).format("Unknown command %s%n", command);
                     }
 
                     if (out != null) {
