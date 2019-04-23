@@ -47,6 +47,7 @@ import org.apache.commons.vfs2.provider.sftp.SftpFileSystemConfigBuilder;
 import org.apache.commons.vfs2.provider.sftp.SftpStreamProxy;
 import org.apache.commons.vfs2.provider.sftp.TrustEveryoneUserInfo;
 import org.apache.commons.vfs2.test.AbstractProviderTestConfig;
+import org.apache.commons.vfs2.test.PermissionsSkipPermissionCheckingTests;
 import org.apache.commons.vfs2.test.PermissionsTests;
 import org.apache.commons.vfs2.test.ProviderReadTests;
 import org.apache.commons.vfs2.test.ProviderTestConfig;
@@ -91,6 +92,7 @@ public class SftpProviderTestCase extends AbstractProviderTestConfig {
      * The underlying filesystem
      */
     private SftpFileSystem fileSystem;
+    private boolean skipPermissionChecking;
 
     /**
      * Implements FileSystemFactory because SSHd does not know about users and home directories.
@@ -299,7 +301,13 @@ public class SftpProviderTestCase extends AbstractProviderTestConfig {
         final TestSuite suite = new TestSuite();
 
         // --- Standard VFS test suite
-        final SftpProviderTestCase standardTestCase = new SftpProviderTestCase(false);
+        final SftpProviderTestCase standardTestCase = new SftpProviderTestCase(false, false) {
+            @Override
+            public void prepare(DefaultFileSystemManager manager) throws Exception {
+                super.prepare(manager);
+                Server.setCommandFactory(new ScpCommandFactory(new TestCommandFactory()));
+            }
+        };
         final ProviderTestSuite sftpSuite = new BaseProviderTestSuite(standardTestCase);
 
         // VFS-405: set/get permissions
@@ -307,11 +315,37 @@ public class SftpProviderTestCase extends AbstractProviderTestConfig {
 
         suite.addTest(sftpSuite);
 
+
+        final SftpProviderTestCase skipTestCase = new SftpProviderTestCase(false, true) {
+            @Override
+            public void prepare(DefaultFileSystemManager manager) throws Exception {
+                super.prepare(manager);
+                Server.setCommandFactory(new ScpCommandFactory(new TestNoCommandFactory()));
+            }
+        };
+        final ProviderTestSuite sftpSkipSuite = new BaseProviderTestSuite(skipTestCase){
+            @Override
+            protected void addBaseTests() throws Exception {
+            //    addTests(PermissionsSkipPermissionCheckingTests.class);
+            }
+        };
+
+        sftpSkipSuite.addTests(PermissionsSkipPermissionCheckingTests.class);
+
+        suite.addTest(sftpSkipSuite);
+
+
         // --- VFS-440: stream proxy test suite
         // We override the addBaseTests method so that only
         // one test is run (we just test that the input/output are correctly forwarded, and
         // hence if the reading test succeeds/fails the other will also succeed/fail)
-        final SftpProviderTestCase streamProxyTestCase = new SftpProviderTestCase(true);
+        final SftpProviderTestCase streamProxyTestCase = new SftpProviderTestCase(true,false) {
+            @Override
+            public void prepare(DefaultFileSystemManager manager) throws Exception {
+                super.prepare(manager);
+                Server.setCommandFactory(new ScpCommandFactory(new TestCommandFactory()));
+            }
+        };
         final ProviderTestSuite sftpStreamSuite = new BaseProviderTestSuite(streamProxyTestCase) {
             @Override
             protected void addBaseTests() throws Exception {
@@ -353,8 +387,9 @@ public class SftpProviderTestCase extends AbstractProviderTestConfig {
         }
     }
 
-    public SftpProviderTestCase(final boolean streamProxyMode) {
+    public SftpProviderTestCase(final boolean streamProxyMode, boolean skipPermissionChecking) {
         this.streamProxyMode = streamProxyMode;
+        this.skipPermissionChecking = skipPermissionChecking;
     }
 
     /**
@@ -393,6 +428,10 @@ public class SftpProviderTestCase extends AbstractProviderTestConfig {
 
             // Set up the new URI
             uri = String.format("sftp://%s@localhost:%d", userInfo, parsedURI.getPort());
+        }
+
+        if(skipPermissionChecking) {
+            builder.setSkipPermissionChecking(fileSystemOptions, true);
         }
 
         final FileObject fileObject = manager.resolveFile(uri, fileSystemOptions);
@@ -476,6 +515,59 @@ public class SftpProviderTestCase extends AbstractProviderTestConfig {
                             new PrintStream(err).format("Unknown command %s%n", command);
                         }
                         code = -1;
+                    }
+
+                    if (out != null) {
+                        out.flush();
+                    }
+                    if (err != null) {
+                        err.flush();
+                    }
+                    callback.onExit(code);
+                }
+
+                @Override
+                public void destroy() {
+                }
+            };
+        }
+    }
+
+    private static class TestNoCommandFactory extends ScpCommandFactory {
+
+        @Override
+        public Command createCommand(final String command) {
+            return new Command() {
+                public ExitCallback callback = null;
+                public OutputStream out = null;
+                public OutputStream err = null;
+                public InputStream in = null;
+
+                @Override
+                public void setInputStream(final InputStream in) {
+                    this.in = in;
+                }
+
+                @Override
+                public void setOutputStream(final OutputStream out) {
+                    this.out = out;
+                }
+
+                @Override
+                public void setErrorStream(final OutputStream err) {
+                    this.err = err;
+                }
+
+                @Override
+                public void setExitCallback(final ExitCallback callback) {
+                    this.callback = callback;
+                }
+
+                @Override
+                public void start(final Environment env) throws IOException {
+                    int code = 255;
+                    if (err != null) {
+                        new PrintStream(err).format("Unknown command %s%n", command);
                     }
 
                     if (out != null) {
