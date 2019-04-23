@@ -41,6 +41,7 @@ import org.apache.commons.vfs2.FileNotFolderException;
 import org.apache.commons.vfs2.FileObject;
 import org.apache.commons.vfs2.FileSelector;
 import org.apache.commons.vfs2.FileSystem;
+import org.apache.commons.vfs2.FileSystemConfigBuilder;
 import org.apache.commons.vfs2.FileSystemException;
 import org.apache.commons.vfs2.FileType;
 import org.apache.commons.vfs2.FileUtil;
@@ -1433,10 +1434,15 @@ public abstract class AbstractFileObject<AFS extends AbstractFileSystem> impleme
      */
     @Override
     public boolean isExecutable() throws FileSystemException {
-        try {
-            return exists() ? doIsExecutable() : false;
-        } catch (final Exception exc) {
-            throw new FileSystemException("vfs.provider/check-is-executable.error", fileName, exc);
+        if(!isSkipPermissionChecking()) {
+            try {
+                return exists() ? doIsExecutable() : false;
+            } catch (final Exception exc) {
+                throw new FileSystemException(
+                        "vfs.provider/check-is-executable.error", fileName, exc);
+            }
+        } else {
+            return true;
         }
     }
 
@@ -1491,10 +1497,15 @@ public abstract class AbstractFileObject<AFS extends AbstractFileSystem> impleme
      */
     @Override
     public boolean isReadable() throws FileSystemException {
-        try {
-            return exists() ? doIsReadable() : false;
-        } catch (final Exception exc) {
-            throw new FileSystemException("vfs.provider/check-is-readable.error", fileName, exc);
+        if(!isSkipPermissionChecking()) {
+            try {
+                return exists() ? doIsReadable() : false;
+            } catch (final Exception exc) {
+                throw new FileSystemException(
+                        "vfs.provider/check-is-readable.error", fileName, exc);
+            }
+        } else {
+            return true;
         }
     }
 
@@ -1519,17 +1530,22 @@ public abstract class AbstractFileObject<AFS extends AbstractFileSystem> impleme
      */
     @Override
     public boolean isWriteable() throws FileSystemException {
-        try {
-            if (exists()) {
-                return doIsWriteable();
+        if(!isSkipPermissionChecking()) {
+            try {
+                if (exists()) {
+                    return doIsWriteable();
+                }
+                final FileObject parent = getParent();
+                if (parent != null) {
+                    return parent.isWriteable();
+                }
+                return true;
+            } catch (final Exception exc) {
+                throw new FileSystemException(
+                        "vfs.provider/check-is-writeable.error", fileName, exc);
             }
-            final FileObject parent = getParent();
-            if (parent != null) {
-                return parent.isWriteable();
-            }
+        } else {
             return true;
-        } catch (final Exception exc) {
-            throw new FileSystemException("vfs.provider/check-is-writeable.error", fileName, exc);
         }
     }
 
@@ -1787,4 +1803,12 @@ public abstract class AbstractFileObject<AFS extends AbstractFileSystem> impleme
     public String toString() {
         return fileName.getURI();
     }
+
+    private boolean isSkipPermissionChecking() throws FileSystemException {
+        final String scheme = UriParser.extractScheme(getFileSystem().getFileSystemManager().getSchemes(), fileName.getURI(), null);
+        FileSystemConfigBuilder configBuilder = getFileSystem().getFileSystemManager()
+                .getFileSystemConfigBuilder(scheme);
+        return configBuilder != null ? configBuilder.isSkipPermissionChecking(getFileSystem().getFileSystemOptions()) : false;
+    }
+
 }

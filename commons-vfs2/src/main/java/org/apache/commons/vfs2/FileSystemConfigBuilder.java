@@ -26,6 +26,9 @@ public abstract class FileSystemConfigBuilder {
     /** The root uri of the file system */
     private static final String ROOTURI = "rootURI";
 
+    /** Skip permission checking on file object */
+    private static final String SKIP_PERMISSION_CHECKING = "skipPermissionChecking";
+
     /** The prefix to use when resolving system properties */
     private final String prefix;
 
@@ -674,6 +677,30 @@ public abstract class FileSystemConfigBuilder {
      */
     private String getProperty(final String name) {
         return System.getProperty(toPropertyKey(name));
+    }
+
+    /**
+     * Set skip permission checking param value
+     *
+     * @param opts the file system options to modify
+     * @param skipPermissionChecking skip permission checking
+     *
+     * @since 2.0
+     */
+    public void setSkipPermissionChecking(final FileSystemOptions opts, final Boolean skipPermissionChecking) {
+        setParam(opts, SKIP_PERMISSION_CHECKING, skipPermissionChecking);
+    }
+
+    /**
+     * Return skip permission checking param value
+     *
+     * @param opts file system options to work with
+     * @return The root URI
+     *
+     * @since 2.0
+     */
+    public boolean isSkipPermissionChecking(final FileSystemOptions opts) {
+        return getBoolean(opts, SKIP_PERMISSION_CHECKING, false);
     }
 
 }
