@@ -27,7 +27,7 @@ jobs:
           steps:
             - run:
                 name: build
-                command: mvn -e -X -pl commons-vfs2 -Dchangelist=.ivm.${CIRCLE_BUILD_NUM} -Dgpg.skip -Dmaven.test.skip=true -Ddoclint=none -Dbintray.repository=release -Dbintray.serverId=bintray-international-vending-machines-maven -Dbintray.subject=international-vending-machines  clean package com.carrotgarden.maven:bintray-maven-plugin:1.3.20180612164212:deploy
+                command: mvn -s .circleci/settings.xml -pl commons-vfs2 -Dchangelist=.ivm.${CIRCLE_BUILD_NUM} -Dgpg.skip -Dmaven.test.skip=true -Ddoclint=none -Dbintray.repository=release -Dbintray.serverId=bintray-international-vending-machines-maven -Dbintray.subject=international-vending-machines  clean package com.carrotgarden.maven:bintray-maven-plugin:1.3.20180612164212:deploy
 ## id::layout::url
 #  # -DaltReleaseDeploymentRepository=bintray-international-vendig-machines-maven::default::https://api.bintray.com/maven/international-vendig-machines/maven/commons-vfs2/;publish=1
 ##  -DaltReleaseDeploymentRepository
